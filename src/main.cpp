@@ -13,6 +13,7 @@
 #include <string_view>
 #include <vector>
 
+constexpr double kDeltaTime = 1.0/240;
 constexpr int kVertex = 0;  // layout(location = 0) in vec2 vertex;
 constexpr int kCenter = 1;  // layout(location = 1) in vec2 center;
 constexpr int kMvp = 0;     // layout(binding = 0) uniform MVP { ... }
@@ -112,8 +113,14 @@ class Game {
   }
 
   void Run() {
+    double time = glfwGetTime();
     while (!glfwWindowShouldClose(window_)) {
       glfwPollEvents();
+      const double now = glfwGetTime();
+      while (time < now) {
+        time += kDeltaTime;
+        Update();
+      }
       Draw();
       glfwSwapBuffers(window_);
     }
@@ -191,12 +198,19 @@ class Game {
     DrawBalls();
   }
 
+  void Update() {
+    time_ += kDeltaTime;
+    balls_[0].position.x = std::cos(time_);
+    balls_[0].position.y = std::sin(time_);
+  }
+
   GLFWwindow* const window_;
   const GLuint ball_shader_;
   const GLuint line_shader_;
   GLuint box_vertices_;
   GLuint line_vertices_;
   GLuint mvp_, instances_;
+  double time_ = 0;
   std::vector<Ball> balls_;
   std::vector<Line> lines_;
 };
@@ -206,6 +220,7 @@ int main() {
   GLFWwindow* window = glfwCreateWindow(640, 480, "Game", nullptr, nullptr);
   if (!window) Die("glfwCreateWindow");
   glfwMakeContextCurrent(window);
+  glfwSwapInterval(1);
   if (!gladLoadGL(glfwGetProcAddress)) Die("gladLoadGL");
 
   GLuint vertex_array;
