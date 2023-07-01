@@ -5,6 +5,7 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/transform.hpp>
 
+#include <algorithm>
 #include <array>
 #include <filesystem>
 #include <fstream>
@@ -13,6 +14,7 @@
 #include <string_view>
 #include <vector>
 
+constexpr float kRadius = 1.0f;  // Currently hard-coded in the shader.
 constexpr float kScale = 100.0f;
 constexpr float kDeltaTime = 1.0/240;
 constexpr glm::vec2 kGravity = glm::vec2(0, 50);
@@ -233,6 +235,55 @@ class Game {
     for (Ball& ball : balls_) {
       ball.velocity += kGravity * kDeltaTime;
       ball.position += ball.velocity * kDeltaTime;
+    }
+
+    // Check for collisions between lines and balls.
+    for (const Line& line : lines_) {
+      const glm::vec2 d = line.b - line.a;
+      for (Ball& ball : balls_) {
+        // Check for a collision.
+        const glm::vec2 v = ball.position - line.a;
+        const float t = std::clamp(glm::dot(d, v) / glm::dot(d, d), 0.0f, 1.0f);
+        const glm::vec2 p = line.a + t * d;
+        const glm::vec2 offset = ball.position - p;
+        const float square_distance = glm::dot(offset, offset);
+        if (square_distance > kRadius * kRadius) continue;
+
+        // Handle the collision.
+        const float overlap = kRadius - std::sqrt(square_distance);
+        const glm::vec2 normal = glm::normalize(offset);
+        ball.position += 0.8f * overlap * normal;
+        const float separation_speed = glm::dot(ball.velocity, normal);
+        if (separation_speed < 0) {
+          ball.velocity -= 1.8f * separation_speed * normal;
+        }
+      }
+    }
+
+    // Check for collisions between balls.
+    int n = balls_.size();
+    for (int i = 0; i < n; i++) {
+      Ball& a = balls_[i];
+      for (int j = i + 1; j < n; j++) {
+        // Check for a collision.
+        Ball& b = balls_[j];
+        const glm::vec2 offset = b.position - a.position;
+        const float square_distance = glm::dot(offset, offset);
+        if (square_distance > 4 * kRadius * kRadius) continue;
+
+        // Handle the collision.
+        const float overlap = 2 * kRadius - std::sqrt(square_distance);
+        const glm::vec2 normal = glm::normalize(offset);
+        a.position -= 0.4f * overlap * normal;
+        b.position += 0.4f * overlap * normal;
+        const float separation_speed =
+            glm::dot(b.velocity - a.velocity, normal);
+        if (separation_speed < 0) {
+          const glm::vec2 correction = 0.9f * separation_speed * normal;
+          a.velocity += correction;
+          b.velocity -= correction;
+        }
+      }
     }
   }
 
