@@ -67,9 +67,31 @@ int main() {
       LinkProgram(std::array{vertex_shader, fragment_shader});
   glDeleteShader(vertex_shader);
   glDeleteShader(fragment_shader);
+  glUseProgram(program);
+
+  static constexpr float kTriangle[] = {
+    -1.0f, -1.0f,
+     1.0f, -1.0f,
+     0.0f,  1.0f,
+  };
+
+  GLuint vertex_buffer;
+  glGenBuffers(1, &vertex_buffer);
+  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(kTriangle), kTriangle, GL_STATIC_DRAW);
+  constexpr int kPosition = 0;  // layout(location = 0) in vec2 position;
+  glEnableVertexAttribArray(kPosition);
+  glVertexAttribPointer(kPosition, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
+
+    int width, height;
+    glfwGetFramebufferSize(window, &width, &height);
+    glViewport(0, 0, width, height);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glDrawArrays(GL_TRIANGLES, 0, 3);
     glfwSwapBuffers(window);
   }
 }
