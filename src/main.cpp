@@ -15,7 +15,7 @@
 #include <vector>
 
 constexpr float kRadius = 1.0f;  // Currently hard-coded in the shader.
-constexpr float kScale = 100.0f;
+constexpr float kScale = 25.0f;
 constexpr float kDeltaTime = 1.0/240;
 constexpr glm::vec2 kGravity = glm::vec2(0, 50);
 constexpr int kVertex = 0;  // layout(location = 0) in vec2 vertex;
@@ -227,7 +227,7 @@ class Game {
   void Update() {
     // Remove balls which have moved far away from the origin.
     std::erase_if(balls_, [](const Ball& ball) {
-      constexpr float kBoundary = 32;
+      constexpr float kBoundary = 5000 / kScale;
       return glm::dot(ball.position, ball.position) > kBoundary * kBoundary;
     });
 
