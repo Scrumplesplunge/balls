@@ -63,6 +63,10 @@ int main() {
   glGenVertexArrays(1, &vertex_array);
   glBindVertexArray(vertex_array);
 
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glEnable(GL_BLEND);
+  glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+
   const GLuint vertex_shader = LoadShader(GL_VERTEX_SHADER, "src/shader.vert");
   const GLuint fragment_shader =
       LoadShader(GL_FRAGMENT_SHADER, "src/shader.frag");
@@ -87,6 +91,24 @@ int main() {
   constexpr int kVertex = 0;  // layout(location = 0) in vec2 vertex;
   glEnableVertexAttribArray(kVertex);
   glVertexAttribPointer(kVertex, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+  static constexpr float kInstances[] = {
+    0.0f, 0.0f,
+    -1.5f, 0.0f,
+    1.5f, 0.0f,
+  };
+  constexpr int kNumInstances = sizeof(kInstances) / (2 * sizeof(float));
+
+  GLuint instance_buffer;
+  glGenBuffers(1, &instance_buffer);
+  glBindBuffer(GL_ARRAY_BUFFER, instance_buffer);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(kInstances), kInstances,
+               GL_DYNAMIC_DRAW);
+  constexpr int kCenter = 1;  // layout(location = 1) in vec2 center;
+  glEnableVertexAttribArray(kCenter);
+  glVertexAttribPointer(kCenter, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float),
+                        nullptr);
+  glVertexAttribDivisor(kCenter, 1);
 
   constexpr int kMvp = 0;  // layout(binding = 0) uniform MVP { ... }
   struct {
@@ -113,7 +135,7 @@ int main() {
         glm::scale(glm::vec3(100.0f, 100.0f, 1.0f));
     glBufferData(GL_UNIFORM_BUFFER, sizeof(mvp), &mvp, GL_DYNAMIC_DRAW);
 
-    glDrawArrays(GL_TRIANGLE_FAN, 0, kNumBoxVertices);
+    glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, kNumBoxVertices, kNumInstances);
     glfwSwapBuffers(window);
   }
 }
