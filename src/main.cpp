@@ -13,8 +13,10 @@ int main() {
   if (!glfwInit()) Die("glfwInit");
   GLFWwindow* window = glfwCreateWindow(640, 480, "Game", nullptr, nullptr);
   if (!window) Die("glfwCreateWindow");
+  glfwMakeContextCurrent(window);
 
   while (!glfwWindowShouldClose(window)) {
-    glfwWaitEvents();
+    glfwPollEvents();
+    glfwSwapBuffers(window);
   }
 }
