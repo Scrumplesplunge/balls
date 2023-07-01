@@ -130,17 +130,33 @@ class Game {
     double time = glfwGetTime();
     while (!glfwWindowShouldClose(window_)) {
       glfwPollEvents();
+      UpdateMatrices();
+
       const double now = glfwGetTime();
       while (time < now) {
         time += kDeltaTime;
         Update();
       }
+
       Draw();
       glfwSwapBuffers(window_);
     }
   }
 
  private:
+  void UpdateMatrices() {
+    int width, height;
+    glfwGetFramebufferSize(window_, &width, &height);
+    glViewport(0, 0, width, height);
+
+    glm::mat4 to_screen =
+        glm::translate(glm::vec3(0.5 * width, 0.5 * height, 0)) *
+        glm::scale(glm::vec3(kScale, kScale, 1.0f));
+    from_screen_ = glm::inverse(to_screen);
+    view_ = glm::ortho(0.0f, float(width), float(height), 0.0f, 1.0f, -1.0f) *
+            to_screen;
+  }
+
   void DrawBalls() const {
     // Select the box vertex buffer.
     glBindBuffer(GL_ARRAY_BUFFER, box_vertices_);
@@ -191,18 +207,12 @@ class Game {
   }
 
   void Draw() const {
-    int width, height;
-    glfwGetFramebufferSize(window_, &width, &height);
-    glViewport(0, 0, width, height);
     glClear(GL_COLOR_BUFFER_BIT);
 
     struct {
       glm::mat4 matrix;
     } mvp;
-    mvp.matrix =
-        glm::ortho(0.0f, float(width), float(height), 0.0f, 1.0f, -1.0f) *
-        glm::translate(glm::vec3(0.5 * width, 0.5 * height, 0)) *
-        glm::scale(glm::vec3(kScale, kScale, 1.0f));
+    mvp.matrix = view_;
 
     glBufferData(GL_UNIFORM_BUFFER, sizeof(mvp), &mvp, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_UNIFORM_BUFFER, mvp_);
@@ -220,9 +230,7 @@ class Game {
   }
 
   void HandleMouseMove(glm::vec2 position) {
-    int width, height;
-    glfwGetFramebufferSize(window_, &width, &height);
-    mouse_ = (position - 0.5f * glm::vec2(width, height)) / kScale;
+    mouse_ = glm::vec2(from_screen_ * glm::vec4(position, 0.0f, 1.0f));
     std::cout << mouse_.x << ", " << mouse_.y << "\n";
 
     if (drawing_ && glm::distance(line_start_, mouse_) > 0.1) {
@@ -255,6 +263,7 @@ class Game {
   GLuint mvp_, instances_;
   std::vector<Ball> balls_;
   std::vector<Line> lines_;
+  glm::mat4 view_, from_screen_;
 
   // Drawing state.
   bool drawing_ = false;
