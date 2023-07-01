@@ -231,8 +231,6 @@ class Game {
 
   void HandleMouseMove(glm::vec2 position) {
     mouse_ = glm::vec2(from_screen_ * glm::vec4(position, 0.0f, 1.0f));
-    std::cout << mouse_.x << ", " << mouse_.y << "\n";
-
     if (drawing_ && glm::distance(line_start_, mouse_) > 0.1) {
       lines_.push_back(Line{.a = line_start_, .b = mouse_});
       line_start_ = mouse_;
