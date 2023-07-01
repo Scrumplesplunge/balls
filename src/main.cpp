@@ -93,6 +93,17 @@ class Game {
       : window_(window),
         ball_shader_(LoadShaderProgram("src/ball.vert", "src/ball.frag")),
         line_shader_(LoadShaderProgram("src/line.vert", "src/line.frag")) {
+    glfwSetWindowUserPointer(window_, this);
+    glfwSetCursorPosCallback(window_,
+                             [](GLFWwindow* window, double x, double y) {
+                               ((Game*)glfwGetWindowUserPointer(window))
+                                   ->HandleMouseMove(glm::vec2(x, y));
+                             });
+    glfwSetMouseButtonCallback(
+        window_, [](GLFWwindow* window, int button, int action, int mods) {
+          ((Game*)glfwGetWindowUserPointer(window))
+              ->HandleMouseButton(button, action);
+        });
 
     GLuint buffers[3];
     glGenBuffers(3, buffers);
@@ -110,6 +121,12 @@ class Game {
               {.position = glm::vec2(1.5f, 0.0f)}};
     lines_ = {{.a = glm::vec2(-2.6f, -1.1f), .b = glm::vec2(2.6f, -1.1f)},
               {.a = glm::vec2(-2.6f, 1.1f), .b = glm::vec2(2.6f, 1.1f)}};
+  }
+
+  ~Game() {
+    glfwSetCursorPosCallback(window_, nullptr);
+    glfwSetMouseButtonCallback(window_, nullptr);
+    glfwSetWindowUserPointer(window_, nullptr);
   }
 
   void Run() {
@@ -202,6 +219,14 @@ class Game {
     time_ += kDeltaTime;
     balls_[0].position.x = std::cos(time_);
     balls_[0].position.y = std::sin(time_);
+  }
+
+  void HandleMouseMove(glm::vec2 position) {
+    std::cout << position.x << ", " << position.y << "\n";
+  }
+
+  void HandleMouseButton(int button, int action) {
+    std::cout << "mouse button " << button << ": " << action << "\n";
   }
 
   GLFWwindow* const window_;
