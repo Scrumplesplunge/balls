@@ -72,19 +72,21 @@ int main() {
   glDeleteShader(fragment_shader);
   glUseProgram(program);
 
-  static constexpr float kTriangle[] = {
+  static constexpr float kBox[] = {
     -1.0f, -1.0f,
-     1.0f, -1.0f,
-     0.0f,  1.0f,
+    -1.0f, 1.0f,
+    1.0f, 1.0f,
+    1.0f, -1.0f,
   };
+  constexpr int kNumBoxVertices = sizeof(kBox) / (2 * sizeof(float));
 
   GLuint vertex_buffer;
   glGenBuffers(1, &vertex_buffer);
   glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(kTriangle), kTriangle, GL_STATIC_DRAW);
-  constexpr int kPosition = 0;  // layout(location = 0) in vec2 position;
-  glEnableVertexAttribArray(kPosition);
-  glVertexAttribPointer(kPosition, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(kBox), kBox, GL_STATIC_DRAW);
+  constexpr int kVertex = 0;  // layout(location = 0) in vec2 vertex;
+  glEnableVertexAttribArray(kVertex);
+  glVertexAttribPointer(kVertex, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
   constexpr int kMvp = 0;  // layout(binding = 0) uniform MVP { ... }
   struct {
@@ -108,11 +110,10 @@ int main() {
     mvp.matrix =
         glm::ortho(0.0f, float(width), float(height), 0.0f, 1.0f, -1.0f) *
         glm::translate(glm::vec3(0.5 * width, 0.5 * height, 0)) *
-        glm::scale(glm::vec3(100.0f, 100.0f, 1.0f)) *
-        glm::rotate((float)glfwGetTime(), glm::vec3(0.0f, 0.0f, 1.0f));
+        glm::scale(glm::vec3(100.0f, 100.0f, 1.0f));
     glBufferData(GL_UNIFORM_BUFFER, sizeof(mvp), &mvp, GL_DYNAMIC_DRAW);
 
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, kNumBoxVertices);
     glfwSwapBuffers(window);
   }
 }
