@@ -135,10 +135,14 @@ class Game {
       UpdateMatrices();
 
       const double now = glfwGetTime();
-      while (time < now) {
-        time += kDeltaTime;
-        Update();
+      const int required_ticks = (now - time) / kDeltaTime;
+      const int bounded_ticks = std::min(6, required_ticks);
+      if (const int missed = required_ticks - bounded_ticks; missed) {
+        std::cerr << "Lag: missed " << missed
+                  << (missed == 1 ? " tick.\n" : " ticks\n.");
       }
+      for (int i = 0; i < bounded_ticks; i++) Update();
+      time += kDeltaTime * required_ticks;
 
       Draw();
       glfwSwapBuffers(window_);
