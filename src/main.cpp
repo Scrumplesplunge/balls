@@ -11,6 +11,7 @@
 #include <iostream>
 #include <span>
 #include <string_view>
+#include <vector>
 
 constexpr int kVertex = 0;  // layout(location = 0) in vec2 vertex;
 constexpr int kCenter = 1;  // layout(location = 1) in vec2 center;
@@ -69,6 +70,137 @@ GLuint LoadShaderProgram(const std::filesystem::path& vertex_shader_path,
   return program;
 }
 
+struct Ball {
+  glm::vec2 position;
+};
+
+struct Line {
+  glm::vec2 a, b;
+};
+
+static constexpr float kBox[] = {
+  -1.0f, -1.0f,
+  -1.0f, 1.0f,
+  1.0f, 1.0f,
+  1.0f, -1.0f,
+};
+constexpr int kNumBoxVertices = sizeof(kBox) / (2 * sizeof(float));
+
+class Game {
+ public:
+  Game(GLFWwindow* window)
+      : window_(window),
+        ball_shader_(LoadShaderProgram("src/ball.vert", "src/ball.frag")),
+        line_shader_(LoadShaderProgram("src/line.vert", "src/line.frag")) {
+
+    GLuint buffers[3];
+    glGenBuffers(3, buffers);
+    auto [box_vertices, mvp, instances] = buffers;
+
+    box_vertices_ = box_vertices;
+    mvp_ = mvp;
+    instances_ = instances;
+
+    glBindBuffer(GL_ARRAY_BUFFER, box_vertices_);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(kBox), kBox, GL_STATIC_DRAW);
+
+    balls_ = {{.position = glm::vec2(0.0f, 0.0f)},
+              {.position = glm::vec2(-1.5f, 0.0f)},
+              {.position = glm::vec2(1.5f, 0.0f)}};
+    lines_ = {{.a = glm::vec2(-2.6f, -1.1f), .b = glm::vec2(2.6f, -1.1f)},
+              {.a = glm::vec2(-2.6f, 1.1f), .b = glm::vec2(2.6f, 1.1f)}};
+  }
+
+  void Run() {
+    while (!glfwWindowShouldClose(window_)) {
+      glfwPollEvents();
+      Draw();
+      glfwSwapBuffers(window_);
+    }
+  }
+
+ private:
+  void DrawBalls() const {
+    // Select the box vertex buffer.
+    glBindBuffer(GL_ARRAY_BUFFER, box_vertices_);
+    glEnableVertexAttribArray(kVertex);
+    glVertexAttribPointer(kVertex, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+    // Load the instance data for all balls.
+    std::vector<glm::vec2> instances;
+    instances.reserve(balls_.size());
+    for (const Ball& ball : balls_) instances.push_back(ball.position);
+    glBindBuffer(GL_ARRAY_BUFFER, instances_);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * instances.size(),
+                 instances.data(), GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(kCenter);
+    glVertexAttribPointer(kCenter, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+    glVertexAttribDivisor(kCenter, 1);
+
+    // Draw all the balls.
+    glUseProgram(ball_shader_);
+    glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, kNumBoxVertices,
+                          instances.size());
+
+    // Disable the vertex arrays again.
+    glDisableVertexAttribArray(kVertex);
+    glDisableVertexAttribArray(kCenter);
+  }
+
+  void DrawLines() const {
+    // Load the vertices for all lines.
+    std::vector<glm::vec2> vertices;
+    vertices.reserve(2 * lines_.size());
+    for (const Line& line : lines_) {
+      vertices.push_back(line.a);
+      vertices.push_back(line.b);
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, instances_);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * vertices.size(),
+                 vertices.data(), GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(kVertex);
+    glVertexAttribPointer(kVertex, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
+
+    // Draw all the lines.
+    glUseProgram(line_shader_);
+    glDrawArrays(GL_LINES, 0, vertices.size());
+
+    // Disable the vertex array.
+    glDisableVertexAttribArray(kVertex);
+  }
+
+  void Draw() const {
+    int width, height;
+    glfwGetFramebufferSize(window_, &width, &height);
+    glViewport(0, 0, width, height);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    struct {
+      glm::mat4 matrix;
+    } mvp;
+    mvp.matrix =
+        glm::ortho(0.0f, float(width), float(height), 0.0f, 1.0f, -1.0f) *
+        glm::translate(glm::vec3(0.5 * width, 0.5 * height, 0)) *
+        glm::scale(glm::vec3(100.0f, 100.0f, 1.0f));
+
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(mvp), &mvp, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_UNIFORM_BUFFER, mvp_);
+    glBindBufferBase(GL_UNIFORM_BUFFER, kMvp, mvp_);
+
+    DrawLines();
+    DrawBalls();
+  }
+
+  GLFWwindow* const window_;
+  const GLuint ball_shader_;
+  const GLuint line_shader_;
+  GLuint box_vertices_;
+  GLuint line_vertices_;
+  GLuint mvp_, instances_;
+  std::vector<Ball> balls_;
+  std::vector<Line> lines_;
+};
+
 int main() {
   if (!glfwInit()) Die("glfwInit");
   GLFWwindow* window = glfwCreateWindow(640, 480, "Game", nullptr, nullptr);
@@ -84,96 +216,6 @@ int main() {
   glEnable(GL_BLEND);
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
-  const GLuint ball_shader =
-      LoadShaderProgram("src/ball.vert", "src/ball.frag");
-  const GLuint line_shader =
-      LoadShaderProgram("src/line.vert", "src/line.frag");
-
-  static constexpr float kBox[] = {
-    -1.0f, -1.0f,
-    -1.0f, 1.0f,
-    1.0f, 1.0f,
-    1.0f, -1.0f,
-  };
-  constexpr int kNumBoxVertices = sizeof(kBox) / (2 * sizeof(float));
-
-  GLuint vertex_buffer;
-  glGenBuffers(1, &vertex_buffer);
-  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(kBox), kBox, GL_STATIC_DRAW);
-
-  static constexpr float kInstances[] = {
-    0.0f, 0.0f,
-    -1.5f, 0.0f,
-    1.5f, 0.0f,
-  };
-  constexpr int kNumInstances = sizeof(kInstances) / (2 * sizeof(float));
-
-  GLuint instance_buffer;
-  glGenBuffers(1, &instance_buffer);
-  glBindBuffer(GL_ARRAY_BUFFER, instance_buffer);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(kInstances), kInstances,
-               GL_DYNAMIC_DRAW);
-
-  struct {
-    glm::mat4 matrix;
-  } mvp;
-
-  GLuint mvp_buffer;
-  glGenBuffers(1, &mvp_buffer);
-  glBindBuffer(GL_UNIFORM_BUFFER, mvp_buffer);
-  glBufferData(GL_UNIFORM_BUFFER, sizeof(mvp), &mvp, GL_DYNAMIC_DRAW);
-  glBindBufferBase(GL_UNIFORM_BUFFER, kMvp, mvp_buffer);
-
-  static constexpr float kLines[] = {
-    -2.6f, -1.1f, 2.6f, -1.1f,
-    -2.6f, 1.1f, 2.6f, 1.1f,
-  };
-  constexpr int kNumLineVertices = sizeof(kLines) / (2 * sizeof(float));
-
-  GLuint line_buffer;
-  glGenBuffers(1, &line_buffer);
-  glBindBuffer(GL_ARRAY_BUFFER, line_buffer);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(kLines), kLines, GL_STATIC_DRAW);
-
-  while (!glfwWindowShouldClose(window)) {
-    glfwPollEvents();
-
-    int width, height;
-    glfwGetFramebufferSize(window, &width, &height);
-    glViewport(0, 0, width, height);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    mvp.matrix =
-        glm::ortho(0.0f, float(width), float(height), 0.0f, 1.0f, -1.0f) *
-        glm::translate(glm::vec3(0.5 * width, 0.5 * height, 0)) *
-        glm::scale(glm::vec3(100.0f, 100.0f, 1.0f));
-    glBufferData(GL_UNIFORM_BUFFER, sizeof(mvp), &mvp, GL_DYNAMIC_DRAW);
-
-    glUseProgram(ball_shader);
-    glBindBuffer(GL_UNIFORM_BUFFER, mvp_buffer);
-    glBindBufferBase(GL_UNIFORM_BUFFER, kMvp, mvp_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-    glEnableVertexAttribArray(kVertex);
-    glVertexAttribPointer(kVertex, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
-    glBindBuffer(GL_ARRAY_BUFFER, instance_buffer);
-    glEnableVertexAttribArray(kCenter);
-    glVertexAttribPointer(kCenter, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float),
-                          nullptr);
-    glVertexAttribDivisor(kCenter, 1);
-    glDrawArraysInstanced(GL_TRIANGLE_FAN, 0, kNumBoxVertices, kNumInstances);
-    glDisableVertexAttribArray(kVertex);
-    glDisableVertexAttribArray(kCenter);
-
-    glUseProgram(line_shader);
-    glBindBuffer(GL_UNIFORM_BUFFER, mvp_buffer);
-    glBindBufferBase(GL_UNIFORM_BUFFER, kMvp, mvp_buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, line_buffer);
-    glEnableVertexAttribArray(kVertex);
-    glVertexAttribPointer(kVertex, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
-    glDrawArrays(GL_LINES, 0, kNumLineVertices);
-    glDisableVertexAttribArray(kVertex);
-
-    glfwSwapBuffers(window);
-  }
+  Game game(window);
+  game.Run();
 }
