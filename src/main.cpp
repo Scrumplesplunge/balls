@@ -67,9 +67,9 @@ int main() {
   glEnable(GL_BLEND);
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
-  const GLuint vertex_shader = LoadShader(GL_VERTEX_SHADER, "src/shader.vert");
+  const GLuint vertex_shader = LoadShader(GL_VERTEX_SHADER, "src/ball.vert");
   const GLuint fragment_shader =
-      LoadShader(GL_FRAGMENT_SHADER, "src/shader.frag");
+      LoadShader(GL_FRAGMENT_SHADER, "src/ball.frag");
   const GLuint program =
       LinkProgram(std::array{vertex_shader, fragment_shader});
   glDeleteShader(vertex_shader);
