@@ -1,6 +1,9 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include <glad/gl.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/transform.hpp>
 
 #include <array>
 #include <filesystem>
@@ -83,6 +86,17 @@ int main() {
   glEnableVertexAttribArray(kPosition);
   glVertexAttribPointer(kPosition, 2, GL_FLOAT, GL_FALSE, 0, nullptr);
 
+  constexpr int kMvp = 0;  // layout(binding = 0) uniform MVP { ... }
+  struct {
+    glm::mat4 matrix;
+  } mvp;
+
+  GLuint mvp_buffer;
+  glGenBuffers(1, &mvp_buffer);
+  glBindBuffer(GL_UNIFORM_BUFFER, mvp_buffer);
+  glBufferData(GL_UNIFORM_BUFFER, sizeof(mvp), &mvp, GL_DYNAMIC_DRAW);
+  glBindBufferBase(GL_UNIFORM_BUFFER, kMvp, mvp_buffer);
+
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
 
@@ -90,6 +104,13 @@ int main() {
     glfwGetFramebufferSize(window, &width, &height);
     glViewport(0, 0, width, height);
     glClear(GL_COLOR_BUFFER_BIT);
+
+    mvp.matrix =
+        glm::ortho(0.0f, float(width), float(height), 0.0f, 1.0f, -1.0f) *
+        glm::translate(glm::vec3(0.5 * width, 0.5 * height, 0)) *
+        glm::scale(glm::vec3(100.0f, 100.0f, 1.0f)) *
+        glm::rotate((float)glfwGetTime(), glm::vec3(0.0f, 0.0f, 1.0f));
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(mvp), &mvp, GL_DYNAMIC_DRAW);
 
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glfwSwapBuffers(window);
