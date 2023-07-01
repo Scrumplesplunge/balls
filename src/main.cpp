@@ -14,7 +14,8 @@
 #include <vector>
 
 constexpr float kScale = 100.0f;
-constexpr double kDeltaTime = 1.0/240;
+constexpr float kDeltaTime = 1.0/240;
+constexpr glm::vec2 kGravity = glm::vec2(0, 50);
 constexpr int kVertex = 0;  // layout(location = 0) in vec2 vertex;
 constexpr int kCenter = 1;  // layout(location = 1) in vec2 center;
 constexpr int kMvp = 0;     // layout(binding = 0) uniform MVP { ... }
@@ -74,6 +75,7 @@ GLuint LoadShaderProgram(const std::filesystem::path& vertex_shader_path,
 
 struct Ball {
   glm::vec2 position;
+  glm::vec2 velocity;
 };
 
 struct Line {
@@ -116,12 +118,6 @@ class Game {
 
     glBindBuffer(GL_ARRAY_BUFFER, box_vertices_);
     glBufferData(GL_ARRAY_BUFFER, sizeof(kBox), kBox, GL_STATIC_DRAW);
-
-    balls_ = {{.position = glm::vec2(0.0f, 0.0f)},
-              {.position = glm::vec2(-1.5f, 0.0f)},
-              {.position = glm::vec2(1.5f, 0.0f)}};
-    lines_ = {{.a = glm::vec2(-2.6f, -1.1f), .b = glm::vec2(2.6f, -1.1f)},
-              {.a = glm::vec2(-2.6f, 1.1f), .b = glm::vec2(2.6f, 1.1f)}};
   }
 
   ~Game() {
@@ -217,9 +213,10 @@ class Game {
   }
 
   void Update() {
-    time_ += kDeltaTime;
-    balls_[0].position.x = std::cos(time_);
-    balls_[0].position.y = std::sin(time_);
+    for (Ball& ball : balls_) {
+      ball.velocity += kGravity * kDeltaTime;
+      ball.position += ball.velocity * kDeltaTime;
+    }
   }
 
   void HandleMouseMove(glm::vec2 position) {
@@ -256,7 +253,6 @@ class Game {
   GLuint box_vertices_;
   GLuint line_vertices_;
   GLuint mvp_, instances_;
-  double time_ = 0;
   std::vector<Ball> balls_;
   std::vector<Line> lines_;
 
