@@ -13,6 +13,7 @@
 #include <string_view>
 #include <vector>
 
+constexpr float kScale = 100.0f;
 constexpr double kDeltaTime = 1.0/240;
 constexpr int kVertex = 0;  // layout(location = 0) in vec2 vertex;
 constexpr int kCenter = 1;  // layout(location = 1) in vec2 center;
@@ -205,7 +206,7 @@ class Game {
     mvp.matrix =
         glm::ortho(0.0f, float(width), float(height), 0.0f, 1.0f, -1.0f) *
         glm::translate(glm::vec3(0.5 * width, 0.5 * height, 0)) *
-        glm::scale(glm::vec3(100.0f, 100.0f, 1.0f));
+        glm::scale(glm::vec3(kScale, kScale, 1.0f));
 
     glBufferData(GL_UNIFORM_BUFFER, sizeof(mvp), &mvp, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_UNIFORM_BUFFER, mvp_);
@@ -222,11 +223,31 @@ class Game {
   }
 
   void HandleMouseMove(glm::vec2 position) {
-    std::cout << position.x << ", " << position.y << "\n";
+    int width, height;
+    glfwGetFramebufferSize(window_, &width, &height);
+    mouse_ = (position - 0.5f * glm::vec2(width, height)) / kScale;
+    std::cout << mouse_.x << ", " << mouse_.y << "\n";
+
+    if (drawing_ && glm::distance(line_start_, mouse_) > 0.1) {
+      lines_.push_back(Line{.a = line_start_, .b = mouse_});
+      line_start_ = mouse_;
+    }
   }
 
   void HandleMouseButton(int button, int action) {
-    std::cout << "mouse button " << button << ": " << action << "\n";
+    if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+      if (action == GLFW_PRESS) {
+        line_start_ = mouse_;
+        drawing_ = true;
+      } else if (action == GLFW_RELEASE) {
+        if (glm::distance(line_start_, mouse_) > 0.01) {
+          lines_.push_back(Line{.a = line_start_, .b = mouse_});
+        }
+        drawing_ = false;
+      }
+    } else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+      balls_.push_back(Ball{.position = mouse_});
+    }
   }
 
   GLFWwindow* const window_;
@@ -238,6 +259,11 @@ class Game {
   double time_ = 0;
   std::vector<Ball> balls_;
   std::vector<Line> lines_;
+
+  // Drawing state.
+  bool drawing_ = false;
+  glm::vec2 line_start_;
+  glm::vec2 mouse_ = glm::vec2();
 };
 
 int main() {
