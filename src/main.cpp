@@ -223,6 +223,13 @@ class Game {
   }
 
   void Update() {
+    // Remove balls which have moved far away from the origin.
+    std::erase_if(balls_, [](const Ball& ball) {
+      constexpr float kBoundary = 32;
+      return glm::dot(ball.position, ball.position) > kBoundary * kBoundary;
+    });
+
+    // Update the balls according to gravity.
     for (Ball& ball : balls_) {
       ball.velocity += kGravity * kDeltaTime;
       ball.position += ball.velocity * kDeltaTime;
