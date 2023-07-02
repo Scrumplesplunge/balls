@@ -17,6 +17,7 @@
 
 constexpr float kRadius = 1.0f;  // Currently hard-coded in the shader.
 constexpr float kScale = 25.0f;
+constexpr float kBoundary = 5000 / kScale;
 constexpr float kDeltaTime = 1.0/240;
 constexpr glm::vec2 kGravity = glm::vec2(0, 50);
 constexpr int kVertex = 0;  // layout(location = 0) in vec2 vertex;
@@ -238,7 +239,6 @@ class Game {
 
     // Remove balls which have moved far away from the origin.
     std::erase_if(balls_, [](const Ball& ball) {
-      constexpr float kBoundary = 5000 / kScale;
       return glm::dot(ball.position, ball.position) > kBoundary * kBoundary;
     });
 
@@ -246,25 +246,72 @@ class Game {
     std::shuffle(balls_.begin(), balls_.end(), gen_);
     std::shuffle(lines_.begin(), lines_.end(), gen_);
 
+    constexpr double kCellSize = 2 * kRadius;
+    constexpr int kGridRadius = 1 + std::ceil(kBoundary / kCellSize);
+    constexpr int kGridSize = 4 * kGridRadius * kGridRadius;
+
+    constexpr int kMaxCellSize = 15;
+    struct Cell {
+      void push_back(std::uint16_t x) {
+        if (size == kMaxCellSize) throw std::runtime_error("Cell overflowed.");
+        data[size++] = x;
+      }
+
+      std::uint16_t* begin() { return data; }
+      std::uint16_t* end() { return data + size; }
+
+      std::uint16_t size = 0;
+      std::uint16_t data[kMaxCellSize];
+    };
+
+    std::vector<Cell> balls(kGridSize);
+
+    struct Point { int x, y, i; };
+    static constexpr auto cell = [](glm::vec2 position) {
+      const int x = int(position.x / kCellSize) + kGridRadius;
+      const int y = int(position.y / kCellSize) + kGridRadius;
+      const int i = y * 2 * kGridRadius + x;
+      return Point{.x = x, .y = y, .i = i};
+    };
+
+    for (int i = 0, n = balls_.size(); i < n; i++) {
+      const Ball& b = balls_[i];
+      const Point p = cell(b.position);
+      balls[p.i].push_back(i);
+    }
+
     // Check for collisions between lines and balls.
     for (const Line& line : lines_) {
       const glm::vec2 d = line.b - line.a;
-      for (Ball& ball : balls_) {
-        // Check for a collision.
-        const glm::vec2 v = ball.position - line.a;
-        const float t = std::clamp(glm::dot(d, v) / glm::dot(d, d), 0.0f, 1.0f);
-        const glm::vec2 p = line.a + t * d;
-        const glm::vec2 offset = ball.position - p;
-        const float square_distance = glm::dot(offset, offset);
-        if (square_distance > kRadius * kRadius) continue;
+      const Point a = cell(line.a);
+      const Point b = cell(line.b);
+      const int x_min = std::min(a.x, b.x) - 1;
+      const int x_max = std::max(a.x, b.x) + 1;
+      const int y_min = std::min(a.y, b.y) - 1;
+      const int y_max = std::max(a.y, b.y) + 1;
+      for (int y = y_min; y <= y_max; y++) {
+        for (int x = x_min; x <= x_max; x++) {
+          for (int ball_index : balls[2 * kGridRadius * y + x]) {
+            Ball& ball = balls_[ball_index];
 
-        // Handle the collision.
-        const float overlap = kRadius - std::sqrt(square_distance);
-        const glm::vec2 normal = glm::normalize(offset);
-        ball.position += 0.8f * overlap * normal;
-        const float separation_speed = glm::dot(ball.velocity, normal);
-        if (separation_speed < 0) {
-          ball.velocity -= 1.8f * separation_speed * normal;
+            // Check for a collision.
+            const glm::vec2 v = ball.position - line.a;
+            const float t =
+                std::clamp(glm::dot(d, v) / glm::dot(d, d), 0.0f, 1.0f);
+            const glm::vec2 p = line.a + t * d;
+            const glm::vec2 offset = ball.position - p;
+            const float square_distance = glm::dot(offset, offset);
+            if (square_distance > kRadius * kRadius) continue;
+
+            // Handle the collision.
+            const float overlap = kRadius - std::sqrt(square_distance);
+            const glm::vec2 normal = glm::normalize(offset);
+            ball.position += 0.8f * overlap * normal;
+            const float separation_speed = glm::dot(ball.velocity, normal);
+            if (separation_speed < 0) {
+              ball.velocity -= 1.8f * separation_speed * normal;
+            }
+          }
         }
       }
     }
@@ -273,24 +320,35 @@ class Game {
     int n = balls_.size();
     for (int i = 0; i < n; i++) {
       Ball& a = balls_[i];
-      for (int j = i + 1; j < n; j++) {
-        // Check for a collision.
-        Ball& b = balls_[j];
-        const glm::vec2 offset = b.position - a.position;
-        const float square_distance = glm::dot(offset, offset);
-        if (square_distance > 4 * kRadius * kRadius) continue;
+      const Point p = cell(a.position);
+      const int x_min = p.x - 1;
+      const int x_max = p.x + 1;
+      const int y_min = p.y - 1;
+      const int y_max = p.y + 1;
+      for (int y = y_min; y <= y_max; y++) {
+        for (int x = x_min; x <= x_max; x++) {
+          for (int ball_index : balls[2 * kGridRadius * y + x]) {
+            if (ball_index == i) continue;
 
-        // Handle the collision.
-        const float overlap = 2 * kRadius - std::sqrt(square_distance);
-        const glm::vec2 normal = glm::normalize(offset);
-        a.position -= 0.4f * overlap * normal;
-        b.position += 0.4f * overlap * normal;
-        const float separation_speed =
-            glm::dot(b.velocity - a.velocity, normal);
-        if (separation_speed < 0) {
-          const glm::vec2 correction = 0.9f * separation_speed * normal;
-          a.velocity += correction;
-          b.velocity -= correction;
+            // Check for a collision.
+            Ball& b = balls_[ball_index];
+            const glm::vec2 offset = b.position - a.position;
+            const float square_distance = glm::dot(offset, offset);
+            if (square_distance > 4 * kRadius * kRadius) continue;
+
+            // Handle the collision.
+            const float overlap = 2 * kRadius - std::sqrt(square_distance);
+            const glm::vec2 normal = glm::normalize(offset);
+            a.position -= 0.4f * overlap * normal;
+            b.position += 0.4f * overlap * normal;
+            const float separation_speed =
+                glm::dot(b.velocity - a.velocity, normal);
+            if (separation_speed < 0) {
+              const glm::vec2 correction = 0.9f * separation_speed * normal;
+              a.velocity += correction;
+              b.velocity -= correction;
+            }
+          }
         }
       }
     }
