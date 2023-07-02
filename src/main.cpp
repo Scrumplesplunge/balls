@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <random>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -241,6 +242,10 @@ class Game {
       return glm::dot(ball.position, ball.position) > kBoundary * kBoundary;
     });
 
+    // Randomly shuffle all balls and lines to prevent the order from mattering.
+    std::shuffle(balls_.begin(), balls_.end(), gen_);
+    std::shuffle(lines_.begin(), lines_.end(), gen_);
+
     // Check for collisions between lines and balls.
     for (const Line& line : lines_) {
       const glm::vec2 d = line.b - line.a;
@@ -315,6 +320,7 @@ class Game {
     }
   }
 
+  std::ranlux24 gen_{std::random_device()()};
   GLFWwindow* const window_;
   const GLuint ball_shader_;
   const GLuint line_shader_;
