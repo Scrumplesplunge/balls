@@ -229,17 +229,17 @@ class Game {
   }
 
   void Update() {
-    // Remove balls which have moved far away from the origin.
-    std::erase_if(balls_, [](const Ball& ball) {
-      constexpr float kBoundary = 5000 / kScale;
-      return glm::dot(ball.position, ball.position) > kBoundary * kBoundary;
-    });
-
     // Update the balls according to gravity.
     for (Ball& ball : balls_) {
       ball.velocity += kGravity * kDeltaTime;
       ball.position += ball.velocity * kDeltaTime;
     }
+
+    // Remove balls which have moved far away from the origin.
+    std::erase_if(balls_, [](const Ball& ball) {
+      constexpr float kBoundary = 5000 / kScale;
+      return glm::dot(ball.position, ball.position) > kBoundary * kBoundary;
+    });
 
     // Check for collisions between lines and balls.
     for (const Line& line : lines_) {
